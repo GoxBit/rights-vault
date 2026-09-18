@@ -86,4 +86,32 @@ public class DateRangeTests
         Assert.False(first.OverlapsWith(second));
         Assert.False(second.OverlapsWith(first));
     }
+
+    [Fact]
+    public void OverlapsWith_WhenOneRangeContainsOther_ReturnsTrue()
+    {
+        var outer = new DateRange(
+            new DateOnly(2026, 1, 1),
+            new DateOnly(2026, 12, 31));
+        var inner = new DateRange(
+            new DateOnly(2026, 3, 1),
+            new DateOnly(2026, 6, 30));
+
+        Assert.True(outer.OverlapsWith(inner));
+        Assert.True(inner.OverlapsWith(outer));
+    }
+
+    [Fact]
+    public void OverlapsWith_WhenRangesAreIdentical_ReturnsTrue()
+    {
+        var first = new DateRange(
+            new DateOnly(2026, 1, 1),
+            new DateOnly(2026, 1, 31));
+        var second = new DateRange(
+            new DateOnly(2026, 1, 1),
+            new DateOnly(2026, 1, 31));
+
+        Assert.True(first.OverlapsWith(second));
+        Assert.True(second.OverlapsWith(first));
+    }
 }
