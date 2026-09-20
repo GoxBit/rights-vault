@@ -1,4 +1,5 @@
 # rights-vault
+[![CI](https://github.com/GoxBit/rights-vault/actions/workflows/ci.yml/badge.svg)](https://github.com/GoxBit/rights-vault/actions/workflows/ci.yml)
 Clean Architecture rich entity
 
 ## IAM: push de imágenes a ECR
