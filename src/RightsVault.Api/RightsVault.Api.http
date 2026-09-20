@@ -1,6 +1,21 @@
 @RightsVault.Api_HostAddress = http://localhost:5243
 
-GET {{RightsVault.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Crear acuerdo
+POST {{RightsVault.Api_HostAddress}}/agreements
+Content-Type: application/json
 
-###
+{
+  "title": "HBO Max License",
+  "start": "2026-01-01",
+  "end": "2026-12-31",
+  "hasExclusivity": true
+}
+
+### Renovar (reemplaza el GUID)
+PUT {{RightsVault.Api_HostAddress}}/agreements/{{agreementId}}/renew
+Content-Type: application/json
+
+{
+  "newStart": "2027-01-01",
+  "newEnd": "2027-12-31"
+}

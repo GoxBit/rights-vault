@@ -1,12 +1,17 @@
+using RightsVault.Application.UseCases.RenewLicenseAgreement;
+using RightsVault.Domain.Entities;
+using RightsVault.Domain.Repositories;
+using RightsVault.Domain.ValueObjects;
+using RightsVault.Infrastructure.Persistence;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddSingleton<ILicenseAgreementRepository, InMemoryLicenseAgreementRepository>();
+builder.Services.AddScoped<RenewLicenseAgreementHandler>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -14,28 +19,35 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
+app.MapPost("/agreements", async (
+    CreateAgreementRequest req,
+    ILicenseAgreementRepository repo,
+    CancellationToken ct) =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    var agreement = LicenseAgreement.Create(
+        req.Title, new DateRange(req.Start, req.End), req.HasExclusivity);
+    await repo.SaveAsync(agreement, ct);
+    return Results.Created($"/agreements/{agreement.Id}", agreement.Id);
+});
 
-app.MapGet("/weatherforecast", () =>
+app.MapPut("/agreements/{id}/renew", async (
+    Guid id,
+    RenewRequest req,
+    RenewLicenseAgreementHandler handler,
+    CancellationToken ct) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
+    await handler.HandleAsync(
+        new RenewLicenseAgreementCommand(id, req.NewStart, req.NewEnd), ct);
+    return Results.NoContent();
 })
-.WithName("GetWeatherForecast");
+.WithName("RenewAgreement");
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+record CreateAgreementRequest(
+    string Title,
+    DateOnly Start,
+    DateOnly End,
+    bool HasExclusivity);
+
+record RenewRequest(DateOnly NewStart, DateOnly NewEnd);
