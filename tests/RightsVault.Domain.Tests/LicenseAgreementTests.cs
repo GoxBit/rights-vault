@@ -219,5 +219,13 @@ public class LicenseAgreementTests
 
             Assert.IsAssignableFrom<DomainException>(exception);
         }
+
+        [Fact]
+        public void PipelineDetectaFallos_Rojo()
+        {
+            Assert.True(false, "Fallo intencional para validar el pipeline");
+        }
     }
+
+
 }
