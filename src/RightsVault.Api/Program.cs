@@ -1,5 +1,6 @@
 using RightsVault.Application.UseCases.RenewLicenseAgreement;
 using RightsVault.Domain.Entities;
+using RightsVault.Domain.Enums;
 using RightsVault.Domain.Repositories;
 using RightsVault.Domain.ValueObjects;
 using RightsVault.Infrastructure.Persistence;
@@ -24,7 +25,10 @@ app.MapPost("/agreements", async (
     CancellationToken ct) =>
 {
     var agreement = LicenseAgreement.Create(
-        req.Title, new DateRange(req.Start, req.End), req.HasExclusivity);
+        req.Title,
+        new DateRange(req.Start, req.End),
+        new TerritoryCode(req.Territory),
+        req.LicenseType);
     await repo.SaveAsync(agreement, ct);
     return Results.Created($"/agreements/{agreement.Id}", agreement.Id);
 });
@@ -47,6 +51,7 @@ record CreateAgreementRequest(
     string Title,
     DateOnly Start,
     DateOnly End,
-    bool HasExclusivity);
+    string Territory,
+    LicenseType LicenseType);
 
 record RenewRequest(DateOnly NewStart, DateOnly NewEnd);

@@ -1,4 +1,5 @@
 using RightsVault.Domain.Entities;
+using RightsVault.Domain.Enums;
 using RightsVault.Domain.Exceptions;
 using RightsVault.Domain.ValueObjects;
 
@@ -14,13 +15,15 @@ public class LicenseAgreementTests
         int endYear,
         int endMonth,
         int endDay,
-        bool exclusive = false) =>
+        LicenseType licenseType = LicenseType.NonExclusive,
+        string territory = "US") =>
         LicenseAgreement.Create(
             title,
             new DateRange(
                 new DateOnly(startYear, startMonth, startDay),
                 new DateOnly(endYear, endMonth, endDay)),
-            exclusive);
+            new TerritoryCode(territory),
+            licenseType);
 
     public class CreateTests
     {
@@ -33,27 +36,40 @@ public class LicenseAgreementTests
             var term = new DateRange(new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31));
 
             Assert.ThrowsAny<ArgumentException>(() =>
-                LicenseAgreement.Create(title!, term, hasExclusivity: false));
+                LicenseAgreement.Create(title!, term, new TerritoryCode("US"), LicenseType.NonExclusive));
         }
 
         [Fact]
         public void Create_ThrowsArgumentNullException_WhenTermIsNull()
         {
             Assert.Throws<ArgumentNullException>(() =>
-                LicenseAgreement.Create("Max Standard", null!, hasExclusivity: false));
+                LicenseAgreement.Create("Max Standard", null!, new TerritoryCode("US"), LicenseType.NonExclusive));
+        }
+
+        [Fact]
+        public void Create_ThrowsArgumentNullException_WhenTerritoryIsNull()
+        {
+            var term = new DateRange(new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31));
+
+            Assert.Throws<ArgumentNullException>(() =>
+                LicenseAgreement.Create("Max Standard", term, null!, LicenseType.NonExclusive));
         }
 
         [Fact]
         public void Create_AssignsUniqueId_AndPreservesProperties()
         {
             var term = new DateRange(new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31));
+            var territory = new TerritoryCode("US");
 
-            var agreement = LicenseAgreement.Create("HBO Exclusive", term, hasExclusivity: true);
+            var agreement = LicenseAgreement.Create(
+                "HBO Exclusive", term, territory, LicenseType.Exclusive);
 
             Assert.NotEqual(Guid.Empty, agreement.Id);
             Assert.Equal("HBO Exclusive", agreement.Title);
             Assert.Equal(term, agreement.Term);
-            Assert.True(agreement.HasExclusivity);
+            Assert.Equal(territory, agreement.Territory);
+            Assert.Equal(LicenseType.Exclusive, agreement.LicenseType);
+            Assert.Equal(LicenseStatus.Active, agreement.Status);
         }
     }
 
@@ -85,7 +101,7 @@ public class LicenseAgreementTests
         public void Renew_ThrowsExclusivityConflict_WhenOverlapsExclusiveAgreement()
         {
             // Arrange
-            var exclusive = CreateAgreement("HBO Exclusive", 2027, 1, 1, 2027, 12, 31, exclusive: true);
+            var exclusive = CreateAgreement("HBO Exclusive", 2027, 1, 1, 2027, 12, 31, LicenseType.Exclusive);
             var target = CreateAgreement("Max Non-Exclusive", 2026, 1, 1, 2026, 12, 31);
             var renewTerm = new DateRange(new DateOnly(2027, 6, 1), new DateOnly(2027, 12, 31));
 
@@ -100,8 +116,8 @@ public class LicenseAgreementTests
         [Fact]
         public void Renew_ThrowsExclusivityConflict_WhenMultipleExclusive_AndOneOverlaps()
         {
-            var overlappingExclusive = CreateAgreement("Netflix Exclusive", 2027, 1, 1, 2027, 6, 30, exclusive: true);
-            var nonOverlappingExclusive = CreateAgreement("Disney Exclusive", 2028, 1, 1, 2028, 12, 31, exclusive: true);
+            var overlappingExclusive = CreateAgreement("Netflix Exclusive", 2027, 1, 1, 2027, 6, 30, LicenseType.Exclusive);
+            var nonOverlappingExclusive = CreateAgreement("Disney Exclusive", 2028, 1, 1, 2028, 12, 31, LicenseType.Exclusive);
             var target = CreateAgreement("Max Standard", 2026, 1, 1, 2026, 12, 31);
             var renewTerm = new DateRange(new DateOnly(2027, 3, 1), new DateOnly(2027, 9, 30));
 
@@ -123,7 +139,7 @@ public class LicenseAgreementTests
         [Fact]
         public void Renew_UpdatesTerm_WhenExclusiveExists_ButDoesNotOverlap()
         {
-            var exclusive = CreateAgreement("HBO Exclusive", 2028, 1, 1, 2028, 12, 31, exclusive: true);
+            var exclusive = CreateAgreement("HBO Exclusive", 2028, 1, 1, 2028, 12, 31, LicenseType.Exclusive);
             var target = CreateAgreement("Max Standard", 2026, 1, 1, 2026, 12, 31);
             var newTerm = new DateRange(new DateOnly(2027, 1, 1), new DateOnly(2027, 12, 31));
 
@@ -145,9 +161,22 @@ public class LicenseAgreementTests
         }
 
         [Fact]
+        public void Renew_UpdatesTerm_WhenOverlappingAgreementIsLimited()
+        {
+            var overlappingLimited = CreateAgreement(
+                "Paramount Limited", 2027, 1, 1, 2027, 6, 30, LicenseType.Limited);
+            var target = CreateAgreement("Max Standard", 2026, 1, 1, 2026, 12, 31);
+            var newTerm = new DateRange(new DateOnly(2027, 3, 1), new DateOnly(2027, 9, 30));
+
+            target.Renew(newTerm, [overlappingLimited]);
+
+            Assert.Equal(newTerm, target.Term);
+        }
+
+        [Fact]
         public void Renew_DoesNotUpdateTerm_WhenExclusivityConflictOccurs()
         {
-            var exclusive = CreateAgreement("HBO Exclusive", 2027, 1, 1, 2027, 12, 31, exclusive: true);
+            var exclusive = CreateAgreement("HBO Exclusive", 2027, 1, 1, 2027, 12, 31, LicenseType.Exclusive);
             var target = CreateAgreement("Max Non-Exclusive", 2026, 1, 1, 2026, 12, 31);
             var originalTerm = target.Term;
             var renewTerm = new DateRange(new DateOnly(2027, 6, 1), new DateOnly(2027, 12, 31));
@@ -164,7 +193,7 @@ public class LicenseAgreementTests
         [Fact]
         public void Renew_Succeeds_WhenTargetIsExclusive_AndOnlySelfInList()
         {
-            var target = CreateAgreement("HBO Exclusive", 2026, 1, 1, 2026, 12, 31, exclusive: true);
+            var target = CreateAgreement("HBO Exclusive", 2026, 1, 1, 2026, 12, 31, LicenseType.Exclusive);
             var newTerm = new DateRange(new DateOnly(2027, 1, 1), new DateOnly(2027, 12, 31));
 
             target.Renew(newTerm, [target]);
@@ -175,7 +204,7 @@ public class LicenseAgreementTests
         [Fact]
         public void Renew_Succeeds_WhenAdjacentExclusiveTerm_DoesNotOverlap()
         {
-            var exclusive = CreateAgreement("HBO Exclusive", 2026, 1, 1, 2026, 6, 30, exclusive: true);
+            var exclusive = CreateAgreement("HBO Exclusive", 2026, 1, 1, 2026, 6, 30, LicenseType.Exclusive);
             var target = CreateAgreement("Max Standard", 2025, 1, 1, 2025, 12, 31);
             var newTerm = new DateRange(new DateOnly(2026, 6, 30), new DateOnly(2026, 12, 31));
 
