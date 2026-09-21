@@ -3,6 +3,7 @@ using RightsVault.Domain.Entities;
 using RightsVault.Domain.Repositories;
 using RightsVault.Domain.ValueObjects;
 using RightsVault.Infrastructure.Persistence;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,10 +13,8 @@ builder.Services.AddScoped<RenewLicenseAgreementHandler>();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
+app.MapOpenApi();
+app.MapScalarApiReference();
 
 app.UseHttpsRedirection();
 
